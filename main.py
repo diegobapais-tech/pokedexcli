@@ -2,13 +2,15 @@
 
 from cli_color_print import *
 from cli_commands import CLICommand
+from pokecache import PokeCache
 
 import requests
 
 
 MAP_QUERY_SIZE = 20
+MAP_OFFSET_POINTER = 0
 
-map_offset_pointer = 0
+pokecache = PokeCache()
 
 cli_command = {}
 
@@ -23,12 +25,20 @@ def show_help():
         std_command_output(value.info())
 
 def map():
-    global map_offset_pointer
+    global MAP_OFFSET_POINTER
+    global pokecache
 
-    response = requests.get("https://pokeapi.co/api/v2/location-area/",{"limit" : MAP_QUERY_SIZE, "offset" : map_offset_pointer})
-    if response.status_code != 200:
-        error_command_output(f"Error while requesting map areas!\n\tStatus Code: {response.status_code}\n\tReason: {response.reason}")
-        return
+    base_url = "https://pokeapi.co/api/v2/location-area/?limit="
+    params = {"limit" : MAP_QUERY_SIZE, "offset" : MAP_OFFSET_POINTER}
+    area_endpoint = f"{base_url}?limit={MAP_QUERY_SIZE}&offset={MAP_OFFSET_POINTER}"
+    response = pokecache.get(area_endpoint)
+
+    if response is None:
+        response = requests.get(base_url,params)
+        if response.status_code != 200:
+            error_command_output(f"Error while requesting map areas!\n\tStatus Code: {response.status_code}\n\tReason: {response.reason}")
+            return
+        pokecache.add(area_endpoint, response)
     
     data = response.json()
 
@@ -38,8 +48,8 @@ def map():
     
     pokemon_areas = data["results"]
     for pokemon_area in pokemon_areas:
-        map_offset_pointer += 1
-        area_output = str(map_offset_pointer) + ". " + pokemon_area["name"]
+        MAP_OFFSET_POINTER += 1
+        area_output = str(MAP_OFFSET_POINTER) + ". " + pokemon_area["name"]
         success_command_output(area_output)
 
     area_count = len(pokemon_areas)  
@@ -47,18 +57,18 @@ def map():
         
         # To avoid empty command outputs
         if area_count == 0:
-            map_offset_pointer -= MAP_QUERY_SIZE
+            MAP_OFFSET_POINTER -= MAP_QUERY_SIZE
             map()
         
-        map_offset_pointer -= area_count
+        MAP_OFFSET_POINTER -= area_count
         std_command_output("\nYou are in the last page!")
 
 def bmap():
-    global map_offset_pointer
+    global MAP_OFFSET_POINTER
 
-    map_offset_pointer -= 2 * MAP_QUERY_SIZE
-    map_offset_pointer = max(map_offset_pointer, 0)
-    
+    MAP_OFFSET_POINTER -= 2 * MAP_QUERY_SIZE
+    MAP_OFFSET_POINTER = max(MAP_OFFSET_POINTER, 0)
+
     map()
     
     
