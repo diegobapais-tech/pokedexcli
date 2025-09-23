@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
+from cli_color_print import warning_command_output
 
-default_save_time = 30
+default_save_time = 15
 
 class PokeCache():
     def __init__(self, save_time=default_save_time):
@@ -15,6 +16,7 @@ class PokeCache():
     def get(self, url):
         cached_object = self.cache.get(url)
         if cached_object is not None:
+            warning_command_output("*")
             cached_response = cached_object[0]
             self.add(url, cached_response)
             return cached_response
