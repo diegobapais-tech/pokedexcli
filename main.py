@@ -83,7 +83,70 @@ class PokedexCLI:
         self.offset_pointer = max(self.offset_pointer, 0)
         self.list_next_areas()
 
+    def _get_pokemon_encounters(self, area_name: str) -> Dict[str, Any]:
+        area_endpoint = f"{POKEAPI_AREA_URL}{area_name}/"
+        response = self.pokecache.get(area_endpoint)
         
+        if response is None:
+            response = requests.get(area_endpoint)
+            if response.status_code != 200:
+                error_command_output(
+                    "Error while requesting map area!\n"
+                    f"\tStatus Code: {response.status_code}\n"
+                    f"\tReason: {response.reason}")   
+                return
+            self.pokecache.add(area_endpoint, response)    
+
+        return response.json()
+
+    def _list_pokemon_encounters(self, data: dict):
+        for index, pokemon_info in enumerate(data["pokemon_encounters"]):
+            success_command_output(f"{index + 1}. {pokemon_info['pokemon']['name']}")
+
+    def explore_area(self, args=None):
+        if not args:
+            error_command_output(
+                "Error! 'explore' command needs one argument to work!\n"
+                "\tUsage: explore <area>")
+            return
+        
+        area_name = args[0]
+        data = self._get_pokemon_encounters(area_name)
+        
+        self._list_pokemon_encounters(data)
+
+    def _setup_commands(self):
+        self.cli_command["quit"] = CLICommand("quit", "Exit the Pokedex", self.exit_cli)
+        self.cli_command["help"] = CLICommand("help", "Displays a help message", self.show_help)
+        self.cli_command["map"] = CLICommand(
+            "map", "Display the next 20 location areas of the Pokemon world!", self.list_next_areas
+        )
+        self.cli_command["bmap"] = CLICommand(
+            "bmap", "Display the previous 20 location areas of the Pokemon world!", self.list_previous_areas
+        )
+        self.cli_command["explore"] = CLICommand(
+            "explore <area_name>", "Show all the pokemon the live in a specific area!", self.explore_area
+        )
+
+    def repl(self):
+        while True:
+            next_command = std_command_input("Pokedex > ")
+            next_command = next_command.strip()
+            if not next_command:
+                self.exit_cli()
+                continue
+
+            parts = next_command.lower().split()
+            command_name = parts[0]
+            command_args = parts[1:]
+
+
+            if command_name in self.cli_command:
+                self.cli_command[command_name].callback(command_args)
+            else:
+                error_command_output("Unknown command!\nYou can use 'help' if you need it!")
+
+            print("")
 
 
 if __name__ == "__main__":
