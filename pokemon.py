@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+from typing import Optional
 
 @dataclass
 class Stats:
@@ -10,25 +11,21 @@ class Stats:
     speed: int
 
     def __str__(self) -> str:
-        return (
-            f"\t- HP: {self.hp}\n"
-            f"\t- Attack: {self.attack}\n"
-            f"\t- Defense: {self.defense}\n"
-            f"\t- Special Attack: {self.special_attack}\n"
-            f"\t- Special Defense: {self.special_defense}\n"
-            f"\t- Speed: {self.speed}\n"
-        )
-
+        return "".join(f"\t{field.name.capitalize()}: {getattr(self, field.name)}\n" for field in fields(self))
 
 @dataclass
 class Types:
     type1: str
-    type2: str
+    type2: Optional[str]
 
     def __str__(self) -> str:
+        if self.type2:
+            return (
+                f"\t- {self.type1}\n"
+                f"\t- {self.type2}\n"
+            )
         return (
             f"\t- {self.type1}\n"
-            f"\t- {self.type2}\n"
         )
 
 

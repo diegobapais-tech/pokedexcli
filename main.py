@@ -10,10 +10,22 @@ import random
 import requests
 
 
-# TODO: probably wrap this into config file
+# POKEAPI URLs
 POKEAPI_AREA_URL = "https://pokeapi.co/api/v2/location-area/"
 POKEMON_INFO_URL = "https://pokeapi.co/api/v2/pokemon/"
+
 POKEBALL_DMG = 20
+
+# Capture probability thresholds
+HIGH_EXP_THRESHOLD = 220
+MID_EXP_THRESHOLD  = 120
+
+# Capture probabilities
+HIGH_EXP_PROB = 0.2
+MID_EXP_PROB  = 0.25
+LOW_EXP_PROB  = 0.33
+
+# Number of areas printed in each command
 MAP_QUERY_SIZE = 20
 
 
@@ -35,27 +47,34 @@ class PokedexCLI:
         for _, value in self.cli_command.items():
             std_command_output(value.info())
 
-    def _build_area_endpoint(self, offset: int) -> str:
-        return f"{POKEAPI_AREA_URL}?limit={MAP_QUERY_SIZE}&offset={offset}"
-
-    def _get_area_data(self, offset: int) -> Dict[str, Any]:
-        area_endpoint = self._build_area_endpoint(offset)
-        response = self.pokecache.get(area_endpoint)
-
+    def _fetch_from_api(self, url: str) -> Dict[str, Any]:
+        response = self.pokecache.get(url)
         if response is None:
-            params = {"limit": MAP_QUERY_SIZE, "offset": offset}
-            response = requests.get(POKEAPI_AREA_URL, params)
+            response = requests.get(url)
             if response.status_code != 200:
                 error_command_output(
-                    f"Error while requesting map areas!\n"
+                    f"Error while requesting {url}!\n"
                     f"\tStatus Code: {response.status_code}\n"
                     f"\tReason: {response.reason}"
                 )
                 return None
-
-            self.pokecache.add(area_endpoint, response)
-
+            self.pokecache.add(url, response)
         return response.json()
+    
+    def _require_args(self, args, command_name):
+        usage = getattr(self.cli_command.get(command_name),"usage")
+        if not args:
+            error_command_output(
+                f"Error! '{command_name}' command needs an argument to work!\n"
+                f"\tUsage: {usage}"
+            )
+            return False
+        return True
+
+
+    def _get_area_data(self, offset: int) -> Dict[str, Any]:
+        url = f"{POKEAPI_AREA_URL}?limit={MAP_QUERY_SIZE}&offset={offset}"
+        return self._fetch_from_api(url)
 
     def _render_area_page(self, data: dict, offset: int) -> bool:
         pokemon_areas = data["results"]
@@ -91,30 +110,15 @@ class PokedexCLI:
         self.list_next_areas()
 
     def _get_pokemon_encounters(self, area_name: str) -> Dict[str, Any]:
-        area_endpoint = f"{POKEAPI_AREA_URL}{area_name}/"
-        response = self.pokecache.get(area_endpoint)
-        
-        if response is None:
-            response = requests.get(area_endpoint)
-            if response.status_code != 200:
-                error_command_output(
-                    "Error while requesting map area!\n"
-                    f"\tStatus Code: {response.status_code}\n"
-                    f"\tReason: {response.reason}")   
-                return
-            self.pokecache.add(area_endpoint, response)    
-
-        return response.json()
+        url = f"{POKEAPI_AREA_URL}{area_name}/"
+        return self._fetch_from_api(url)
 
     def _list_pokemon_encounters(self, data: dict):
         for index, pokemon_info in enumerate(data["pokemon_encounters"]):
             success_command_output(f"{index + 1}. {pokemon_info['pokemon']['name']}")
 
     def explore_area(self, args=None):
-        if not args:
-            error_command_output(
-                "Error! 'explore' command needs one argument to work!\n"
-                "\tUsage: explore <area_name>")
+        if not self._require_args(args, "explore"):
             return
         
         area_name = args[0]
@@ -122,28 +126,16 @@ class PokedexCLI:
         
         self._list_pokemon_encounters(data)
 
-    def _fetch_pokemon_info(self, pokemon_name: str):
-        pokemon_endpoint = f"{POKEMON_INFO_URL}{pokemon_name}/"
-        response = self.pokecache.get(pokemon_endpoint)
-        
-        if response is None:
-            response = requests.get(pokemon_endpoint)
-            if response.status_code != 200:
-                error_command_output(
-                    f"Error while requesting pokemon '{pokemon_name}'!\n"
-                    f"\tStatus Code: {response.status_code}\n"
-                    f"\tReason: {response.reason}")   
-                return None
-            self.pokecache.add(pokemon_endpoint, response)    
-
-        return response.json()
+    def _get_pokemon_info(self, pokemon_name: str):
+        url = f"{POKEMON_INFO_URL}{pokemon_name}/"
+        return self._fetch_from_api(url)
     
     def _capture_probability(self, base_exp):
-        if base_exp >= 220:
-            return 0.2
-        if base_exp >= 120:
-            return 0.25
-        return 0.33
+        if base_exp >= HIGH_EXP_THRESHOLD:
+            return HIGH_EXP_PROB
+        if base_exp >= MID_EXP_THRESHOLD:
+            return MID_EXP_PROB
+        return LOW_EXP_PROB
     
     def _throw_pokeball_to(self, pokemon_name: str, data: dict):
         std_command_output(f"Throwing a pokeball to {pokemon_name}...")
@@ -154,12 +146,10 @@ class PokedexCLI:
     def _save_pokemon(self, pokemon_name: str, data: dict):
         stats = {}
         raw_response_stats = data["stats"]
-        print(f"base stats {raw_response_stats}")
         for stat in raw_response_stats:
            stat_name = stat["stat"]["name"]
            stat_value = stat["base_stat"]
            stats[stat_name] = stat_value
-        print(f"stats map {stats}")
 
         stats_object = Stats(stats.get("hp"), stats.get("attack"),
                             stats.get("defense"), stats.get("special-attack"),
@@ -182,10 +172,7 @@ class PokedexCLI:
      
     
     def catch_pokemon(self, args=None):
-        if not args:
-            error_command_output(
-                "Error! 'catch' command needs one argument to work!\n"
-                "\tUsage: catch <pokemon_name>")
+        if not self._require_args(args, "catch"):
             return
         
         pokemon_name = args[0]
@@ -193,7 +180,7 @@ class PokedexCLI:
             success_command_output(f"{pokemon_name} is already captured!")
             return
         
-        data = self._fetch_pokemon_info(pokemon_name)
+        data = self._get_pokemon_info(pokemon_name)
         if data is None:
             return
 
@@ -208,10 +195,7 @@ class PokedexCLI:
         self._save_pokemon(pokemon_name, data)
 
     def inspect_pokemon(self, args=None):
-        if not args:
-            error_command_output(
-                "Error! 'inspect' command needs one argument to work!\n"
-                "\tUsage: inspect <pokemon_name>")
+        if not self._require_args(args, "inspect"):
             return
         
         pokemon_name = args[0]
