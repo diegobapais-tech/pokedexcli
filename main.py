@@ -207,6 +207,37 @@ class PokedexCLI:
         success_command_output(f"{pokemon_name} data added to pokedex!")
         self._save_pokemon(pokemon_name, data)
 
+    def inspect_pokemon(self, args=None):
+        if not args:
+            error_command_output(
+                "Error! 'inspect' command needs one argument to work!\n"
+                "\tUsage: inspect <pokemon_name>")
+            return
+        
+        pokemon_name = args[0]
+        pokedex_info =  self.captured_pokemon.get(pokemon_name)
+
+        if pokedex_info is None:
+            error_command_output("you have not caught that pokemon")
+            return
+        
+        success_command_output(str(pokedex_info))
+
+    def list_caught_pokemon(self, args=None):
+        captured_counter = len(self.captured_pokemon)
+
+        if not captured_counter:
+            warning_command_output("No captured pokemon")
+            return
+        
+        captured_pokemon = list(self.captured_pokemon.keys())
+        for index, pokemon_name in enumerate(captured_pokemon):
+            success_command_output(f"{index + 1}. {pokemon_name}")
+
+        success_command_output(f"Total captured pokemon: {captured_counter}")
+        
+            
+
     def _setup_commands(self):
         self.cli_command["quit"] = CLICommand("quit", "Exit the Pokedex", self.exit_cli)
         self.cli_command["help"] = CLICommand("help", "Displays a help message", self.show_help)
@@ -221,6 +252,12 @@ class PokedexCLI:
         )
         self.cli_command["catch"] = CLICommand(
             "catch <pokemon_name>", "Throw a pokeball to an specific pokemon and try to catch it!", self.catch_pokemon
+        )
+        self.cli_command["list"] = CLICommand(
+            "list", "List all the captured pokemon!", self.list_caught_pokemon
+        )
+        self.cli_command["inspect"] = CLICommand(
+            "inspect <pokemon_name>", "Look for data of an specific pokemon in the pokedex!", self.inspect_pokemon
         )
 
     def repl(self):
