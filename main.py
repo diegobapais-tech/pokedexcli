@@ -2,12 +2,18 @@
 
 from cli_color_print import *
 from cli_commands import CLICommand
-from typing import Any, Dict
+from pokemon import Stats, Types, Pokemon
 from pokecache import PokeCache
+from typing import Any, Dict
+
+import random
 import requests
+
 
 # TODO: probably wrap this into config file
 POKEAPI_AREA_URL = "https://pokeapi.co/api/v2/location-area/"
+POKEMON_INFO_URL = "https://pokeapi.co/api/v2/pokemon/"
+POKEBALL_DMG = 20
 MAP_QUERY_SIZE = 20
 
 
@@ -16,6 +22,7 @@ class PokedexCLI:
         self.offset_pointer = 0
         self.pokecache = PokeCache()
         self.cli_command = {}
+        self.captured_pokemon = {}
         self._setup_commands()
 
     def exit_cli(self, args=None):
@@ -107,13 +114,98 @@ class PokedexCLI:
         if not args:
             error_command_output(
                 "Error! 'explore' command needs one argument to work!\n"
-                "\tUsage: explore <area>")
+                "\tUsage: explore <area_name>")
             return
         
         area_name = args[0]
         data = self._get_pokemon_encounters(area_name)
         
         self._list_pokemon_encounters(data)
+
+    def _fetch_pokemon_info(self, pokemon_name: str):
+        pokemon_endpoint = f"{POKEMON_INFO_URL}{pokemon_name}/"
+        response = self.pokecache.get(pokemon_endpoint)
+        
+        if response is None:
+            response = requests.get(pokemon_endpoint)
+            if response.status_code != 200:
+                error_command_output(
+                    f"Error while requesting pokemon '{pokemon_name}'!\n"
+                    f"\tStatus Code: {response.status_code}\n"
+                    f"\tReason: {response.reason}")   
+                return None
+            self.pokecache.add(pokemon_endpoint, response)    
+
+        return response.json()
+    
+    def _capture_probability(self, base_exp):
+        if base_exp >= 220:
+            return 0.2
+        if base_exp >= 120:
+            return 0.25
+        return 0.33
+    
+    def _throw_pokeball_to(self, pokemon_name: str, data: dict):
+        std_command_output(f"Throwing a pokeball to {pokemon_name}...")
+        
+        base_experience = data["base_experience"]
+        return random.random() <= self._capture_probability(base_experience)
+    
+    def _save_pokemon(self, pokemon_name: str, data: dict):
+        stats = {}
+        raw_response_stats = data["stats"]
+        print(f"base stats {raw_response_stats}")
+        for stat in raw_response_stats:
+           stat_name = stat["stat"]["name"]
+           stat_value = stat["base_stat"]
+           stats[stat_name] = stat_value
+        print(f"stats map {stats}")
+
+        stats_object = Stats(stats.get("hp"), stats.get("attack"),
+                            stats.get("defense"), stats.get("special-attack"),
+                            stats.get("special-defense"), stats.get("speed"))
+        
+        types = [None, None]
+        raw_response_types = data["types"]
+        for index, type in  enumerate(raw_response_types):
+            types[index] = type["type"]["name"]
+            
+        types_object = Types(types[0], types[1])
+        
+        height = data["height"]
+        weight = data["weight"]
+
+        new_pokemon = Pokemon(pokemon_name, height, weight,
+                                 stats_object, types_object)
+        
+        self.captured_pokemon[pokemon_name] = new_pokemon
+     
+    
+    def catch_pokemon(self, args=None):
+        if not args:
+            error_command_output(
+                "Error! 'catch' command needs one argument to work!\n"
+                "\tUsage: catch <pokemon_name>")
+            return
+        
+        pokemon_name = args[0]
+        if self.captured_pokemon.get(pokemon_name):
+            success_command_output(f"{pokemon_name} is already captured!")
+            return
+        
+        data = self._fetch_pokemon_info(pokemon_name)
+        if data is None:
+            return
+
+        is_captured = self._throw_pokeball_to(pokemon_name, data)
+
+        if not is_captured:
+            warning_command_output(f"{pokemon_name} escaped!")
+            return
+        
+        success_command_output(f"{pokemon_name} was caught!")
+        success_command_output(f"{pokemon_name} data added to pokedex!")
+        self._save_pokemon(pokemon_name, data)
 
     def _setup_commands(self):
         self.cli_command["quit"] = CLICommand("quit", "Exit the Pokedex", self.exit_cli)
@@ -126,6 +218,9 @@ class PokedexCLI:
         )
         self.cli_command["explore"] = CLICommand(
             "explore <area_name>", "Show all the pokemon the live in a specific area!", self.explore_area
+        )
+        self.cli_command["catch"] = CLICommand(
+            "catch <pokemon_name>", "Throw a pokeball to an specific pokemon and try to catch it!", self.catch_pokemon
         )
 
     def repl(self):
