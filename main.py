@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
-from cli_color_print import *
-from cli_commands import CLICommand
-from pokemon import Stats, Types, Pokemon
-from pokecache import PokeCache
+from pokedexcli.cli_color_print import *
+from pokedexcli.cli_commands import CLICommand
+from pokedexcli.pokemon import Stats, Types, Pokemon
+from pokedexcli.pokecache import PokeCache
 from typing import Any, Dict
 
 import random
@@ -13,8 +13,6 @@ import requests
 # POKEAPI URLs
 POKEAPI_AREA_URL = "https://pokeapi.co/api/v2/location-area/"
 POKEMON_INFO_URL = "https://pokeapi.co/api/v2/pokemon/"
-
-POKEBALL_DMG = 20
 
 # Capture probability thresholds
 HIGH_EXP_THRESHOLD = 220

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from cli_color_print import warning_command_output
+from pokedexcli.cli_color_print import warning_command_output
 
 default_save_time = 15
 
