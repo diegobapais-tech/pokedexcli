@@ -73,7 +73,7 @@ Install the requirements:
 
 ## Usage
 
-You can run the pokedex cli by typing in the root folder: 
+You can run the PokedexCLI by typing in the root folder: 
 
 `python3 main.py` 
 
