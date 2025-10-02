@@ -11,9 +11,10 @@ class PokeCache():
     def add(self, url, response):
         expiration_time = datetime.now() + timedelta(seconds=self.save_time)
         self.cache[url] = (response, expiration_time)
-        self.reap_loop()
+        self._reap_loop()
 
     def get(self, url):
+        self._reap_loop()
         cached_object = self.cache.get(url)
         if cached_object is not None:
             warning_command_output("*")
@@ -23,7 +24,7 @@ class PokeCache():
 
         return None
     
-    def reap_loop(self):
+    def _reap_loop(self):
         keys_to_delete = []
 
         actual_time = datetime.now()
